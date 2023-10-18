@@ -2,9 +2,9 @@ POST http://localhost:3000/register
 Content-Type: application/json
 
 {
-    "name":"Syam",
-    "email":"Syam@fs.com",
-    "password": "Lucky12345"
+    "name":"Sundar",
+    "email":"Sundar@fs.com",
+    "password":"Lucky12345"
 }
 
 ###
@@ -12,6 +12,25 @@ POST http://localhost:3000/login
 Content-Type: application/json
 
 {
-    "email":"lucky@fs.com",
+    "email":"Syam@fs.com",
     "password": "Lucky12345"
 }
+
+###
+GET http://localhost:3000/all-users
+
+###
+GET http://localhost:3000/user/14
+
+###
+PUT  http://localhost:3000/user/14
+Content-Type: application/json
+
+{
+    "name":"Syam",
+    "email":"Syam@fs.com",
+    "password": "Lucky12345"
+}
+
+###
+DELETE http://localhost:3000/user/18

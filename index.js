@@ -1,8 +1,12 @@
-const http = require('http');
-const PORT = process.env.PORT || 3000;
+const express = require('express');
+const bodyParser = require('body-parser');
 const client = require('./connection.js');
 const emailValidator = require('email-validator');
-const createUser = require('./controllers.js');
+const bcrypt = require('bcrypt');
+const {createUser, getUser, getAllusers, getUserById, updateUserById, deleteUserById} = require('./controllers.js')
+
+const app = express();
+app.use(bodyParser.json());
 
 const passwordValidator = (password) =>{
     let value;
@@ -26,94 +30,115 @@ const passwordValidator = (password) =>{
     return {message:message, value:value};
 }
 
-const server = http.createServer(async (req, res) => {
-    const url = req.url;
-    // Request to Register a User
-    if (url === '/register' && req.method === "POST"){
-        let body = '';
-        req.on('data', (chunk) => {
-            body += chunk
-        });
-        req.on('end', async () => {
-            req.body = JSON.parse(body);
-            const validEmail = emailValidator.validate(req.body.email);
-            if (validEmail){
-                const getUser = await client.query('SELECT * FROM public.user WHERE email = $1', [req.body.email]);
-            if (getUser.rows.length === 0){
-                const validPassword = passwordValidator(req.body.password);
-                const {message, value} = validPassword
-                if(value){
-                    createUser(req.body);
-                    res.statusCode = 200;
-                    res.setHeader("Content-Type", "text/html");
-                    res.write(`User Created Succesfully ${req.body.name}`);
-                    res.end();
-                }else{
-                    res.setHeader("Content-Type", "text/html");
-                    res.write(message);
-                    res.end();
-                }
+// Request for User Registration
+app.post('/register', async (req,res) => {
+    const {name, email, password} = req.body;
+    const validateEmail = emailValidator.validate(email);
+    const validatePassword = passwordValidator(password);
+    const validUser = await getUser(email);
+    if (validUser.rows.length === 0){
+        if(validateEmail){
+            if(validatePassword.value){
+                const hassedPassword = await bcrypt.hash(password, 10);
+                const userData = {name:name, email:email, password:hassedPassword};
+                await createUser(userData);
+                res.send("User Created Successfully")
             }else{
-                res.statusCode = 200;
-                res.setHeader("Content-Type", "text/html");
-                res.write('User Already Exists');
-                res.end();
+                res.send(validatePassword.message);
             }
-            }else{
-                res.statusCode = 200;
-                res.setHeader("Content-Type", "text/html");
-                res.write('Invalid Email Address');
-                res.end(); 
-            } 
-        })
-    }
-    // Request to Login a User
-    else if(url === '/login' && req.method === "POST"){
-        let body = '';
-        req.on('data', (chunk) => {
-            body += chunk
-        });
-        req.on('end', async () => {
-            req.body = JSON.parse(body);
-            const validPassword = passwordValidator(req.body.password);
-            const {message, value} = validPassword
-            if (value) {
-                const email = req.body.email.toLowerCase();
-                const getUser = await client.query('SELECT * FROM public.user WHERE email = $1', [email]);
-                if (getUser.rows.length === 0){
-                    res.setHeader("Content-Type", "text/html");
-                    res.write("User Not Found");
-                    res.end();
-                    }else{
-                        if (getUser.rows[0].password === req.body.password){
-                            res.statusCode = 200;
-                            res.setHeader("Content-Type", "text/html");
-                            res.write(`Welcome ${getUser.rows[0].name}`);
-                            res.end();
-                        }else{
-                            res.setHeader("Content-Type", "text/html");
-                            res.write("Invalid Password");
-                            res.end();
-                        }
-                    }
-            }else{
-                res.setHeader("Content-Type", "text/html");
-                    res.write(message);
-                    res.end();
-                }
-            })
+        }else{
+            res.send("Invalid Email Address");
+        }
     }else{
-        res.statusCode = 200;
-        res.setHeader("Content-Type", "text/html");
-        res.write("Welcome to Home Page");
-        res.end();
+        res.send("User Already Exists");
+    }  
+});
+
+
+// Request for User Login
+app.post('/login', async (req,res) =>{
+    const {email, password} = req.body;
+    const validUser = await getUser(email);
+    const dbUser = validUser.rows[0].name;
+    const dbPassword = validUser.rows[0].password;
+    if(validUser.rows.length === 0){
+        res.send("Invalid User");
+    }else{
+        const validatePassword = await bcrypt.compare(password, dbPassword);
+        if(validatePassword){
+            res.send(`Welcome ${dbUser}`);
+        }else{
+            res.send("Incorrect password");
+        }
     }
 });
 
-server.listen(PORT, ()=>{
+
+// Request for Getting All Users
+app.get("/all-users", async(req, res) => {
+    const users = await getAllusers();
+    res.send(users.rows);
+});
+
+
+// Request for Getting User By ID
+app.get("/user/:id", async(req,res) => {
+    const id = req.params.id;
+    const user = await getUserById(id);
+    if(user.rows.length !== 0){
+        res.send(user.rows[0]);
+    }else{
+        res.send("User Doesn`t Exists")
+    }
+});
+
+
+// Request for Updating User By ID
+app.put("/user/:id", async(req,res) => {
+    const id = req.params.id;
+    const {name, email, password} = req.body;
+    const validateEmail = emailValidator.validate(email);
+    const validatePassword = passwordValidator(password);
+    const validUser = await getUserById(id);
+    if (validUser.rows.length !== 0){
+        if(validateEmail){
+            if(validatePassword.value){
+                const hassedPassword = await bcrypt.hash(password, 10);
+                const userData = {name:name, email:email, password:hassedPassword};
+                await updateUserById(id, userData);
+                res.send("User Updated Successfully")
+            }else{
+                res.send(validatePassword.message);
+            }
+        }else{
+            res.send("Invalid Email Address");
+        }
+    }else{
+        res.send("User Doesn`t Exists");
+    }
+});
+
+
+// Request for Deleting User By ID
+app.delete("/user/:id", async(req,res) => {
+    const id = req.params.id;
+    const user = await getUserById(id);
+    if(user.rows.length !== 0){
+        await deleteUserById(id);
+        res.send("User Deleted Successfully");
+    }else{
+        res.send("User Doesn`t Exists")
+    }  
+});
+
+
+// Running the Server on Port 3000
+app.listen(3000, ()=>{
     console.log("Server Running at Port No: 3000");
 });
 
+
+// Database Connection
 client.connect(()=>{
     console.log("Postgre DB Connected");
 });
