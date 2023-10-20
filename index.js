@@ -3,10 +3,30 @@ const bodyParser = require('body-parser');
 const client = require('./connection.js');
 const emailValidator = require('email-validator');
 const bcrypt = require('bcrypt');
-const {createUser, getUser, getAllusers, getUserById, updateUserById, deleteUserById} = require('./controllers.js')
+const jwt = require('jsonwebtoken');
+const {createUser, getUser, getAllusers, getUserById, updateUserById, deleteUserById, getproducts, getproductsByCategory, addProduct, getProductById,updateproductById, deleteProductById} = require('./controllers.js')
 
 const app = express();
 app.use(bodyParser.json());
+
+const authToken = (req,res, next) =>{
+    let jwtToken;
+    const authHeader = req.headers["authorization"];
+    if(authHeader !== undefined){
+        jwtToken = authHeader.split(" ")[1];
+    }
+    if(jwtToken === undefined){
+        res.send("ACCESS DENIED");
+    }else{
+        jwt.verify(jwtToken,"SECERET_KEY", async(err, payload) =>{
+            if(err){
+                res.send(err);
+            }else{
+                next();
+            }
+        });
+    }
+}
 
 const passwordValidator = (password) =>{
     let value;
@@ -29,6 +49,7 @@ const passwordValidator = (password) =>{
     }
     return {message:message, value:value};
 }
+
 
 // Request for User Registration
 app.post('/register', async (req,res) => {
@@ -66,6 +87,8 @@ app.post('/login', async (req,res) =>{
     }else{
         const validatePassword = await bcrypt.compare(password, dbPassword);
         if(validatePassword){
+            const payload = {email: email};
+            jwt.sign(payload, "SECERET_KEY");
             res.send(`Welcome ${dbUser}`);
         }else{
             res.send("Incorrect password");
@@ -75,14 +98,18 @@ app.post('/login', async (req,res) =>{
 
 
 // Request for Getting All Users
-app.get("/all-users", async(req, res) => {
+app.get("/all-users", authToken, async(req, res) => {
     const users = await getAllusers();
-    res.send(users.rows);
+    if (users.rows.length === 0){
+        res.send("No Users Found");
+    }else{
+        res.send(users.rows);
+    }
 });
 
 
 // Request for Getting User By ID
-app.get("/user/:id", async(req,res) => {
+app.get("/user/:id",authToken, async(req,res) => {
     const id = req.params.id;
     const user = await getUserById(id);
     if(user.rows.length !== 0){
@@ -94,7 +121,7 @@ app.get("/user/:id", async(req,res) => {
 
 
 // Request for Updating User By ID
-app.put("/user/:id", async(req,res) => {
+app.put("/user/:id", authToken, async(req,res) => {
     const id = req.params.id;
     const {name, email, password} = req.body;
     const validateEmail = emailValidator.validate(email);
@@ -120,7 +147,7 @@ app.put("/user/:id", async(req,res) => {
 
 
 // Request for Deleting User By ID
-app.delete("/user/:id", async(req,res) => {
+app.delete("/user/:id", authToken, async(req,res) => {
     const id = req.params.id;
     const user = await getUserById(id);
     if(user.rows.length !== 0){
@@ -128,6 +155,77 @@ app.delete("/user/:id", async(req,res) => {
         res.send("User Deleted Successfully");
     }else{
         res.send("User Doesn`t Exists")
+    }  
+});
+
+
+// Request for Getting All Products
+app.get('/products', authToken, async(req,res) => {
+    const products = await getproducts();
+    if (products.rows.length === 0){
+        res.send("No Products Found")
+    }else{
+        res.send(products.rows);
+    }
+});
+
+
+// Request for Getting Products By Category
+app.get('/products/:category', authToken, async(req,res) => {
+    const category = req.params.category
+    const products = await getproductsByCategory(category);
+    if (products.rows.length === 0){
+        res.send("No Products Found on Given Category")
+    }else{
+        res.send(products.rows);
+    }
+});
+
+
+// Request for Adding Product
+app.post('/add-product', authToken, async(req,res) => {
+    const {name, category, description, price} = req.body;
+    await addProduct(name,category,description,price);
+    res.send("Product Added Successfully");
+});
+
+
+// Request for Getting Product By Id
+app.get('/product/:id', authToken, async(req,res) => {
+    const id = req.params.id;
+    const product = await getProductById(id);
+    if (product.rows.length === 0){
+        res.send("Product Doesn`t Exists");
+    }else{
+        res.send(product.rows[0]);
+    }
+});
+
+
+// Request for Updating Product By Id
+app.put('/product/:id', authToken, async(req,res) =>{
+    const {name, category,description,price} = req.body;
+    const id = req.params.id;
+    const userData = {name:name, category:category, description:description, price:price};
+    const product = await getProductById(id);
+    if (product.rows.length === 0){
+        res.send("Product Doesn`t Exists");
+    }else{
+        await updateproductById(id, userData);
+        res.send("Product Updated Successfully");
+    }
+});
+
+
+// Request for Deleting product By ID
+app.delete("/product/:id", authToken, async(req,res) => {
+    const id = req.params.id;
+    const product = await getProductById(id);
+    if(product.rows.length !== 0){
+        await deleteProductById(id);
+        res.send("Product Deleted Successfully");
+    }else{
+        res.send("Product Doesn`t Exists");
     }  
 });
 
@@ -142,4 +240,3 @@ app.listen(3000, ()=>{
 client.connect(()=>{
     console.log("Postgre DB Connected");
 });
-
