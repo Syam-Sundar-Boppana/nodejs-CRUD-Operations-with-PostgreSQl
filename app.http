@@ -61,19 +61,19 @@ Content-Type: application/json
 }
 
 ###
-GET http://localhost:3000/product/1
+GET http://localhost:3000/product/6
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6IlN5YW1AZnMuY29tIiwiaWF0IjoxNjk3Nzk0ODM3fQ.L1JuDhuE9MuBbRM4sdKIz0hAZiizAtO1aaDFS5QNXsw
 
 ###
-PUT  http://localhost:3000/product/3
+PUT  http://localhost:3000/product/6
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6IlN5YW1AZnMuY29tIiwiaWF0IjoxNjk3Nzk0ODM3fQ.L1JuDhuE9MuBbRM4sdKIz0hAZiizAtO1aaDFS5QNXsw
 Content-Type: application/json
 
 {
-    "name":"I Phone 14",
-    "category":"Electronics",
-    "description":"The iPhone is a smartphone made by Apple that combines a computer, iPod, digital camera and cellular phone into one device with a touchscreen interface",
-    "price":49999
+    "name":"Black Cap",
+    "category":"Clothing",
+    "description":"A Nice Black Cap",
+    "price":599
 }
 
 ###
